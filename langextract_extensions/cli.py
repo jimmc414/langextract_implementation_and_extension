@@ -283,7 +283,29 @@ def batch(csv, text_column, id_column, output, prompt, model, max_rows, examples
     example_data = []
     if examples:
         # (Same loading logic as extract command)
-        pass
+        try:
+            with open(examples, 'r') as f:
+                if examples.endswith('.yaml') or examples.endswith('.yml'):
+                    examples_dict = yaml.safe_load(f)
+                else:
+                    examples_dict = json.load(f)
+
+            # Convert to ExampleData objects
+            for ex in examples_dict.get('examples', []):
+                extractions = []
+                for ext in ex.get('extractions', []):
+                    extractions.append(data.Extraction(
+                        extraction_class=ext['class'],
+                        extraction_text=ext['text'],
+                        attributes=ext.get('attributes')
+                    ))
+                example_data.append(data.ExampleData(
+                    text=ex['text'],
+                    extractions=extractions
+                ))
+        except Exception as e:
+            click.echo(f"Error loading examples: {e}", err=True)
+            sys.exit(1)
     
     try:
         from .csv_loader import process_csv_batch
