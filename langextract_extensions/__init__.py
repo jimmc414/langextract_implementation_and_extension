@@ -12,6 +12,10 @@ from .custom_visualization import (
     HTMLTemplate, MinimalTemplate, DarkModeTemplate, CompactTemplate,
     visualize_with_template, create_custom_template, load_template_from_file
 )
+from .templates import (
+    ExtractionTemplate, ExtractionField, DocumentType,
+    TemplateManager, get_builtin_template
+)
 
 # New core features
 from .providers import BaseProvider, ProviderCapabilities, GeminiProvider
@@ -49,6 +53,13 @@ __all__ = [
     'visualize_with_template',
     'create_custom_template',
     'load_template_from_file',
+
+    # Template system
+    'ExtractionTemplate',
+    'ExtractionField',
+    'DocumentType',
+    'TemplateManager',
+    'get_builtin_template',
     
     # Provider system
     'BaseProvider',

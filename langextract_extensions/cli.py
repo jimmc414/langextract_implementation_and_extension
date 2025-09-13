@@ -7,6 +7,8 @@ import os
 import sys
 import json
 import yaml
+import mimetypes
+import PyPDF2
 from typing import Optional
 import langextract as lx
 from langextract import data
@@ -127,10 +129,26 @@ def extract(input, output, format, model, prompt, template, examples, api_key, t
             if not os.path.exists(input):
                 click.echo(f"Error: File not found: {input}", err=True)
                 sys.exit(1)
-            
-            with open(input, 'r', encoding='utf-8') as f:
-                text = f.read()
-            doc = data.Document(text=text, document_id=input)
+            mime_type, _ = mimetypes.guess_type(input)
+
+            if (mime_type == 'application/pdf') or input.lower().endswith('.pdf'):
+                try:
+                    with open(input, 'rb') as f:
+                        reader = PyPDF2.PdfReader(f)
+                        text_parts = []
+                        for page in reader.pages:
+                            page_text = page.extract_text()
+                            if page_text:
+                                text_parts.append(page_text)
+                        text = '\n'.join(text_parts)
+                    doc = data.Document(text=text, document_id=input)
+                except Exception as e:
+                    click.echo(f"Error reading PDF: {e}", err=True)
+                    sys.exit(1)
+            else:
+                with open(input, 'r', encoding='utf-8') as f:
+                    text = f.read()
+                doc = data.Document(text=text, document_id=input)
     
     except Exception as e:
         click.echo(f"Error loading input: {e}", err=True)
