@@ -476,12 +476,15 @@ def extract_with_template(
         document = data.Document(text=document)
     
     # Extract using template
+    model_id = kwargs.pop('model_id', template.preferred_model)
+    temperature = kwargs.pop('temperature', template.temperature)
+
     result = extract(
         text_or_documents=document,
         prompt_description=template.generate_prompt(),
         examples=template.generate_examples(),
-        model_id=kwargs.get('model_id', template.preferred_model),
-        temperature=kwargs.get('temperature', template.temperature),
+        model_id=model_id,
+        temperature=temperature,
         **kwargs
     )
     
