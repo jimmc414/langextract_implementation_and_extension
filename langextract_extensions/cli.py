@@ -220,13 +220,15 @@ def extract(input, output, format, model, prompt, template, examples, api_key, t
     try:
         if format == 'html':
             # Save JSONL first
-            jsonl_path = output.replace('.html', '.jsonl')
+            root, _ = os.path.splitext(output)
+            jsonl_path = root + '.jsonl'
             lx.io.save_annotated_documents([result], output_name=jsonl_path)
             # Generate HTML
             html = lx.visualize(jsonl_path)
-            with open(output, 'w') as f:
+            html_path = root + '.html'
+            with open(html_path, 'w') as f:
                 f.write(html)
-            click.echo(f"✓ Created HTML visualization: {output}")
+            click.echo(f"✓ Created HTML visualization: {html_path}")
             
         elif format == 'jsonl':
             lx.io.save_annotated_documents([result], output_name=output)
@@ -239,11 +241,13 @@ def extract(input, output, format, model, prompt, template, examples, api_key, t
             
         elif format == 'gif':
             # Save JSONL first
-            jsonl_path = output.replace('.gif', '.jsonl')
+            root, _ = os.path.splitext(output)
+            jsonl_path = root + '.jsonl'
             lx.io.save_annotated_documents([result], output_name=jsonl_path)
             # Create GIF
-            create_simple_gif(jsonl_path, output)
-            click.echo(f"✓ Created GIF: {output}")
+            gif_path = root + '.gif'
+            create_simple_gif(jsonl_path, gif_path)
+            click.echo(f"✓ Created GIF: {gif_path}")
             
     except Exception as e:
         click.echo(f"Error saving output: {e}", err=True)
@@ -353,16 +357,20 @@ def multipass(input, strategy, passes, output, model, debug):
         )
         
         # Save results
-        if output.endswith('.html'):
-            jsonl_path = output.replace('.html', '.jsonl')
+        root, ext = os.path.splitext(output)
+        if ext == '.html' or ext == '':
+            jsonl_path = root + '.jsonl'
             lx.io.save_annotated_documents([result], output_name=jsonl_path)
             html = lx.visualize(jsonl_path)
-            with open(output, 'w') as f:
+            html_path = root + '.html'
+            with open(html_path, 'w') as f:
                 f.write(html)
+            output_path = html_path
         else:
             lx.io.save_annotated_documents([result], output_name=output)
-        
-        click.echo(f"✓ Saved results: {output}")
+            output_path = output
+
+        click.echo(f"✓ Saved results: {output_path}")
         click.echo(f"Total extractions: {len(result.extractions)}")
         
     except Exception as e:
