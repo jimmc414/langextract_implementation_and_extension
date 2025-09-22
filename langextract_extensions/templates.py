@@ -758,10 +758,15 @@ BUILTIN_TEMPLATES = {
 }
 
 
+def list_builtin_templates() -> List[str]:
+    """Return canonical identifiers for the built-in templates."""
+    return list(BUILTIN_TEMPLATES.keys())
+
+
 def get_builtin_template(template_type: str) -> Optional[ExtractionTemplate]:
     """
     Get a built-in template by type.
-    
+
     Args:
         template_type: Type of template (e.g., 'legal_judgment', 'invoice')
         
@@ -777,6 +782,7 @@ __all__ = [
     'ExtractionField',
     'ExtractionTemplate',
     'TemplateManager',
+    'list_builtin_templates',
     'get_builtin_template',
     'get_legal_judgment_template',
     'get_invoice_template',

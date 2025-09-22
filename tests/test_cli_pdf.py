@@ -8,9 +8,6 @@ from langextract import data
 
 def test_extract_pdf_local(monkeypatch):
     import importlib
-    import langextract_extensions.templates as templates
-    if not hasattr(templates, "list_builtin_templates"):
-        templates.list_builtin_templates = lambda: []
     cli_module = importlib.import_module("langextract_extensions.cli")
 
     mock_result = data.AnnotatedDocument(text="result", extractions=[], document_id="doc1")

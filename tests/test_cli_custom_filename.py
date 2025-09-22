@@ -1,15 +1,12 @@
 from pathlib import Path
-from click.testing import CliRunner
 from unittest.mock import MagicMock
 
+from click.testing import CliRunner
 from langextract import data
 
 
 def _setup_cli(monkeypatch):
     import importlib
-    import langextract_extensions.templates as templates
-    if not hasattr(templates, "list_builtin_templates"):
-        templates.list_builtin_templates = lambda: []
     cli_module = importlib.import_module("langextract_extensions.cli")
     mock_result = data.AnnotatedDocument(text="result", extractions=[], document_id="doc1")
     monkeypatch.setattr("langextract.extract", MagicMock(return_value=mock_result))
