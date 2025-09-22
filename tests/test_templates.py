@@ -4,11 +4,14 @@ Tests for template system functionality.
 
 import os
 import pytest
+from click.testing import CliRunner
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch
 
 from langextract import data
+import langextract_extensions.cli as cli_module
+
 from langextract_extensions.templates import (
     DocumentType, ExtractionField, ExtractionTemplate,
     TemplateManager, get_builtin_template, list_builtin_templates
@@ -166,7 +169,7 @@ class TestTemplateManager:
     def test_save_and_load_template(self, temp_dir):
         """Test saving and loading templates."""
         manager = TemplateManager(template_dir=temp_dir)
-        
+
         # Create template
         template = ExtractionTemplate(
             template_id="test_template",
@@ -179,17 +182,43 @@ class TestTemplateManager:
             ],
             preferred_model="gemini-2.5-flash-thinking"
         )
-        
+
         # Save template
         success = manager.save_template(template)
         assert success == True
-        
+
         # Load template
         loaded = manager.load_template("test_template")
         assert loaded is not None
         assert loaded.template_id == "test_template"
         assert loaded.preferred_model == "gemini-2.5-flash-thinking"
         assert len(loaded.fields) == 2
+
+    def test_save_template_failure_returns_false(self, temp_dir, monkeypatch):
+        """Template saving failures should return False and not cache the template."""
+        manager = TemplateManager(template_dir=temp_dir)
+
+        template = ExtractionTemplate(
+            template_id="failing_template",
+            name="Failing Template",
+            description="This template should fail to save",
+            document_type=DocumentType.CUSTOM,
+            fields=[ExtractionField("field", "text", "A field")]
+        )
+
+        original_updated_at = template.updated_at
+
+        def fail_open(*args, **kwargs):  # pragma: no cover - replaced for regression safety
+            raise OSError("Disk full")
+
+        monkeypatch.setattr("builtins.open", fail_open)
+
+        success = manager.save_template(template)
+
+        assert success is False
+        assert (temp_dir / "failing_template.yaml").exists() is False
+        assert template.template_id not in manager._cache
+        assert template.updated_at == original_updated_at
     
     def test_list_templates(self, temp_dir):
         """Test listing available templates."""
@@ -208,10 +237,11 @@ class TestTemplateManager:
         
         # List templates
         templates = manager.list_templates()
+
+        assert isinstance(templates, list)
+        assert all(isinstance(t, str) for t in templates)
         assert len(templates) >= 3
-        assert "template_0" in templates
-        assert "template_1" in templates
-        assert "template_2" in templates
+        assert {"template_0", "template_1", "template_2"}.issubset(set(templates))
     
     def test_delete_template(self, temp_dir):
         """Test deleting templates."""
@@ -264,6 +294,42 @@ class TestTemplateManager:
         assert imported is not None
         assert imported.template_id == "export_test"
         assert len(imported.fields) == 2
+
+
+class TestTemplateCLIIntegration:
+    """Tests for CLI interactions that rely on TemplateManager."""
+
+    def test_template_list_command_handles_custom_templates(self, temp_dir, monkeypatch):
+        """Ensure the CLI can list custom templates without type errors."""
+        manager = TemplateManager(template_dir=temp_dir)
+
+        template = ExtractionTemplate(
+            template_id="custom_cli_template",
+            name="CLI Template",
+            description="Template saved for CLI listing",
+            document_type=DocumentType.CUSTOM,
+            fields=[ExtractionField("name", "text", "Name field")]
+        )
+
+        assert manager.save_template(template) is True
+
+        monkeypatch.setattr(
+            cli_module,
+            "TemplateManager",
+            lambda: TemplateManager(template_dir=temp_dir)
+        )
+
+        runner = CliRunner()
+
+        result = runner.invoke(cli_module.template_list, [])
+        assert result.exit_code == 0
+        assert result.exception is None
+        assert "custom_cli_template" in result.output
+
+        verbose_result = runner.invoke(cli_module.template_list, ["-v"])
+        assert verbose_result.exit_code == 0
+        assert verbose_result.exception is None
+        assert "Name: CLI Template" in verbose_result.output
 
 
 class TestBuiltinTemplates:

@@ -317,27 +317,42 @@ class TemplateManager:
             fields=fields,
             **kwargs
         )
-        
-        self.save_template(template)
+
+        if not self.save_template(template):
+            raise IOError(f"Failed to save template: {template_id}")
         return template
     
-    def save_template(self, template: ExtractionTemplate) -> None:
+    def save_template(self, template: ExtractionTemplate) -> bool:
         """
         Save template to disk.
-        
+
         Args:
             template: Template to save
+
+        Returns:
+            True if the template was saved successfully, False otherwise.
         """
+        previous_updated_at = template.updated_at
         template.updated_at = datetime.now()
-        
-        # Save as YAML for readability
+
         file_path = self.template_dir / f"{template.template_id}.yaml"
-        
-        with open(file_path, 'w') as f:
-            yaml.dump(template.to_dict(), f, default_flow_style=False, sort_keys=False)
-        
-        # Update cache
+
+        try:
+            with open(file_path, 'w') as f:
+                yaml.dump(template.to_dict(), f, default_flow_style=False, sort_keys=False)
+        except Exception:
+            template.updated_at = previous_updated_at
+
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                except OSError:
+                    pass
+
+            return False
+
         self._cache[template.template_id] = template
+        return True
     
     def load_template(self, template_id: str) -> Optional[ExtractionTemplate]:
         """
@@ -370,7 +385,7 @@ class TemplateManager:
         self,
         document_type: Optional[DocumentType] = None,
         tags: Optional[List[str]] = None
-    ) -> List[ExtractionTemplate]:
+    ) -> List[str]:
         """
         List available templates with optional filtering.
         
@@ -379,9 +394,9 @@ class TemplateManager:
             tags: Filter by tags
             
         Returns:
-            List of templates
+            List of template identifiers
         """
-        templates = []
+        templates: List[str] = []
         
         # Load all templates from disk
         for file_path in self.template_dir.glob("*.yaml"):
@@ -396,8 +411,8 @@ class TemplateManager:
                 if tags and not any(tag in template.tags for tag in tags):
                     continue
                 
-                templates.append(template)
-        
+                templates.append(template_id)
+
         return templates
     
     def delete_template(self, template_id: str) -> bool:
@@ -442,14 +457,20 @@ class TemplateManager:
         
         if template:
             # Apply updates
+            original_values: Dict[str, Any] = {}
             for key, value in updates.items():
                 if hasattr(template, key):
+                    original_values[key] = getattr(template, key)
                     setattr(template, key, value)
-            
-            # Save updated template
-            self.save_template(template)
-            return template
-        
+
+            if self.save_template(template):
+                return template
+
+            for key, value in original_values.items():
+                setattr(template, key, value)
+
+            return None
+
         return None
     
     def export_template(
@@ -499,8 +520,9 @@ class TemplateManager:
                     data = yaml.safe_load(f)
             
             template = ExtractionTemplate.from_dict(data)
-            self.save_template(template)
-            return template
+            if self.save_template(template):
+                return template
+            return None
             
         except Exception as e:
             print(f"Failed to import template: {e}")
