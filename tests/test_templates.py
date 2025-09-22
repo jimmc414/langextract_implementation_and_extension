@@ -384,7 +384,7 @@ class TestTemplateBuilder:
         template = builder.build_from_examples(
             example_documents=["Sample document text"],
             expected_extractions=[{
-                "person": ["John Smith"],
+                "person": ["John Smith", "Jane Doe"],
                 "organization": ["Acme Corp"],
                 "email": ["john@acme.com"]
             }],
@@ -402,25 +402,61 @@ class TestTemplateBuilder:
         assert "person" in field_classes
         assert "organization" in field_classes
         assert "email" in field_classes
-    
+
+        field_lookup = {field.name: field for field in template.fields}
+        assert field_lookup["person"].examples[:2] == ["John Smith", "Jane Doe"]
+        assert field_lookup["organization"].examples == ["Acme Corp"]
+        assert field_lookup["email"].examples == ["john@acme.com"]
+
+        assert template.examples, "Generated template should include example data"
+        extraction_pairs = {
+            (extraction.extraction_class, extraction.extraction_text)
+            for extraction in template.examples[0].extractions
+        }
+        assert ("person", "John Smith") in extraction_pairs
+        assert ("person", "Jane Doe") in extraction_pairs
+        assert ("organization", "Acme Corp") in extraction_pairs
+        assert ("email", "john@acme.com") in extraction_pairs
+
     def test_infer_fields(self):
         """Test inferring fields from extractions."""
         builder = TemplateBuilder()
-        
+
         extractions = [
-            {"person": ["Jane Doe", "John Smith"]},
-            {"organization": ["Tech Corp"]},
-            {"date": ["2024-01-01"], "amount": ["$1000"]}
+            {
+                "person": ["Jane Doe", "John Smith"],
+                "email": ["jane@example.com"]
+            },
+            {
+                "person": ["Alice Johnson"],
+                "organization": ["Tech Corp"]
+            },
+            {
+                "person": ["Bob Ray"],
+                "date": ["2024-01-01"],
+                "amount": ["$1000"]
+            }
         ]
-        
+
         fields = builder._infer_fields(extractions)
-        
-        assert len(fields) >= 4
-        field_names = [f.name for f in fields]
-        assert "person" in field_names
-        assert "organization" in field_names
-        assert "date" in field_names
-        assert "amount" in field_names
+
+        assert len(fields) >= 5
+        field_lookup = {field.name: field for field in fields}
+
+        assert field_lookup["person"].examples == [
+            "Jane Doe",
+            "John Smith",
+            "Alice Johnson"
+        ]
+        assert field_lookup["person"].extraction_class == "person"
+        assert field_lookup["person"].required is True
+
+        assert field_lookup["email"].examples == ["jane@example.com"]
+        assert field_lookup["email"].required is False
+
+        assert field_lookup["organization"].examples == ["Tech Corp"]
+        assert field_lookup["date"].examples == ["2024-01-01"]
+        assert field_lookup["amount"].examples == ["$1000"]
 
 
 class TestExtractWithTemplate:
