@@ -11,6 +11,7 @@ import os
 import json
 from typing import List, Dict, Any, Optional, Tuple, Union
 from pathlib import Path
+from collections.abc import Iterable, Mapping
 import click
 
 from langextract import data
@@ -60,9 +61,14 @@ class TemplateBuilder:
         """
         # Analyze expected extractions to determine fields
         fields = self._analyze_extractions(expected_extractions)
-        
+        field_class_map = {field.name: field.extraction_class for field in fields}
+
         # Generate examples for few-shot learning
-        examples = self._create_examples(example_documents, expected_extractions)
+        examples = self._create_examples(
+            example_documents,
+            expected_extractions,
+            field_class_map=field_class_map
+        )
         
         # Create template
         template = ExtractionTemplate(
@@ -81,38 +87,75 @@ class TemplateBuilder:
         
         return template
     
+    def _flatten_values(self, value: Any) -> List[Any]:
+        """Normalize a value to a flat list of scalar items."""
+        if value is None:
+            return [None]
+
+        if isinstance(value, (str, bytes)):
+            return [value]
+
+        if isinstance(value, Mapping):
+            return [value]
+
+        if isinstance(value, Iterable):
+            flattened: List[Any] = []
+            for item in value:
+                flattened.extend(self._flatten_values(item))
+            return flattened
+
+        return [value]
+
+    def _infer_fields(
+        self,
+        expected_extractions: List[Dict[str, Any]]
+    ) -> List[ExtractionField]:
+        """Infer ExtractionField definitions from expected extraction samples."""
+        field_map: Dict[str, Dict[str, Any]] = {}
+        total_sets = len(expected_extractions)
+
+        for extraction_set in expected_extractions:
+            if not isinstance(extraction_set, dict):
+                continue
+
+            for field_name, raw_value in extraction_set.items():
+                info = field_map.setdefault(
+                    field_name,
+                    {"examples": [], "types": set(), "occurrences": 0}
+                )
+                info["occurrences"] += 1
+
+                values = self._flatten_values(raw_value)
+                if not values:
+                    continue
+
+                for item in values:
+                    info["examples"].append(str(item))
+                    info["types"].add(self._infer_type(item))
+
+        fields: List[ExtractionField] = []
+        for name, info in field_map.items():
+            unique_examples = list(dict.fromkeys(info["examples"]))
+            extraction_class = self._determine_class(name, info["types"])
+
+            fields.append(
+                ExtractionField(
+                    name=name,
+                    extraction_class=extraction_class,
+                    description=f"Extract {name.replace('_', ' ')}",
+                    examples=unique_examples[:3],
+                    required=bool(total_sets) and info["occurrences"] == total_sets
+                )
+            )
+
+        return fields
+
     def _analyze_extractions(
         self,
         expected_extractions: List[Dict[str, Any]]
     ) -> List[ExtractionField]:
         """Analyze extractions to determine field definitions."""
-        field_map = {}
-        
-        for extraction_set in expected_extractions:
-            for key, value in extraction_set.items():
-                if key not in field_map:
-                    field_map[key] = {
-                        'examples': [],
-                        'types': set()
-                    }
-                
-                field_map[key]['examples'].append(str(value))
-                field_map[key]['types'].add(self._infer_type(value))
-        
-        # Create fields from analysis
-        fields = []
-        for name, info in field_map.items():
-            extraction_class = self._determine_class(name, info['types'])
-            
-            fields.append(ExtractionField(
-                name=name,
-                extraction_class=extraction_class,
-                description=f"Extract {name.replace('_', ' ')}",
-                examples=info['examples'][:3],  # Keep first 3 examples
-                required=len(info['examples']) == len(expected_extractions)
-            ))
-        
-        return fields
+        return self._infer_fields(expected_extractions)
     
     def _infer_type(self, value: Any) -> str:
         """Infer extraction type from value."""
@@ -173,22 +216,41 @@ class TemplateBuilder:
     def _create_examples(
         self,
         documents: List[str],
-        extractions: List[Dict[str, Any]]
+        extractions: List[Dict[str, Any]],
+        field_class_map: Optional[Dict[str, str]] = None
     ) -> List[data.ExampleData]:
         """Create example data for few-shot learning."""
         examples = []
-        
+
+        field_class_map = field_class_map or {}
+
         for doc, ext_dict in zip(documents[:3], extractions[:3]):
             # Create extractions
             extraction_list = []
-            for key, value in ext_dict.items():
-                extraction_list.append(
-                    data.Extraction(
-                        extraction_class=self._determine_class(key, {self._infer_type(value)}),
-                        extraction_text=str(value)
-                    )
+            if isinstance(ext_dict, dict):
+                items = ext_dict.items()
+            else:
+                items = []
+
+            for key, value in items:
+                values = self._flatten_values(value)
+                if not values:
+                    continue
+
+                type_candidates = {self._infer_type(item) for item in values}
+                extraction_class = field_class_map.get(key) or self._determine_class(
+                    key,
+                    type_candidates
                 )
-            
+
+                for item in values:
+                    extraction_list.append(
+                        data.Extraction(
+                            extraction_class=extraction_class,
+                            extraction_text=str(item)
+                        )
+                    )
+
             # Use first 200 chars as example text
             example_text = doc[:200] if len(doc) > 200 else doc
             
