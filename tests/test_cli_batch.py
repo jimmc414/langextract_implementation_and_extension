@@ -6,9 +6,6 @@ import importlib
 
 
 def test_batch_examples_influence(monkeypatch, sample_examples):
-    import langextract_extensions.templates as templates
-    if not hasattr(templates, "list_builtin_templates"):
-        templates.list_builtin_templates = lambda: []
     cli_module = importlib.import_module("langextract_extensions.cli")
 
     captured = {}

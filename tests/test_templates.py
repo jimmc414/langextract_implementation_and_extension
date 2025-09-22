@@ -11,11 +11,23 @@ from unittest.mock import patch
 from langextract import data
 from langextract_extensions.templates import (
     DocumentType, ExtractionField, ExtractionTemplate,
-    TemplateManager, get_builtin_template
+    TemplateManager, get_builtin_template, list_builtin_templates
 )
 from langextract_extensions.template_builder import (
     TemplateBuilder, extract_with_template
 )
+
+
+class TestBuiltinTemplates:
+    """Tests for built-in template helpers."""
+
+    def test_list_builtin_templates_matches_registry(self):
+        import langextract_extensions.templates as template_module
+
+        builtin_ids = list_builtin_templates()
+
+        assert isinstance(builtin_ids, list)
+        assert builtin_ids == list(template_module.BUILTIN_TEMPLATES.keys())
 
 
 class TestExtractionField:
