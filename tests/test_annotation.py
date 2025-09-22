@@ -29,6 +29,9 @@ class TestAnnotation:
         assert annotation.confidence == ConfidenceLevel.HIGH
         assert annotation.author == "system"
         assert annotation.timestamp is not None
+        ann_dict = annotation.to_dict()
+        assert ann_dict["type"] == AnnotationType.QUALITY_SCORE.value
+        assert ann_dict["confidence"] == ConfidenceLevel.HIGH.value
     
     def test_annotation_types(self):
         """Test different annotation types."""
@@ -66,6 +69,9 @@ class TestAnnotation:
                 author="test"
             )
             assert annotation.confidence == level
+            assert isinstance(level.score, float)
+
+        assert ConfidenceLevel.HIGH.score > ConfidenceLevel.LOW.score
 
 
 class TestQualityScorer:
@@ -82,7 +88,7 @@ class TestQualityScorer:
         extraction = data.Extraction(
             extraction_class="person",
             extraction_text="John Smith",
-            char_interval=data.CharInterval(start=0, end=10)
+            char_interval=data.CharInterval(start_pos=0, end_pos=10)
         )
         
         scorer = QualityScorer()
@@ -116,17 +122,17 @@ class TestQualityScorer:
             data.Extraction(
                 extraction_class="person",
                 extraction_text="Jane Doe",
-                char_interval=data.CharInterval(start=0, end=8)
+                char_interval=data.CharInterval(start_pos=0, end_pos=8)
             ),
             data.Extraction(
                 extraction_class="organization",
                 extraction_text="Tech Corp",
-                char_interval=data.CharInterval(start=18, end=27)
+                char_interval=data.CharInterval(start_pos=18, end_pos=27)
             ),
             data.Extraction(
                 extraction_class="person",
                 extraction_text="She",
-                char_interval=data.CharInterval(start=29, end=32)
+                char_interval=data.CharInterval(start_pos=29, end_pos=32)
             )
         ]
         
@@ -149,17 +155,17 @@ class TestQualityScorer:
             data.Extraction(
                 extraction_class="organization",
                 extraction_text="Apple Inc.",
-                char_interval=data.CharInterval(start=0, end=10)
+                char_interval=data.CharInterval(start_pos=0, end_pos=10)
             ),
             data.Extraction(
                 extraction_class="person",
                 extraction_text="Steve Jobs",
-                char_interval=data.CharInterval(start=26, end=36)
+                char_interval=data.CharInterval(start_pos=26, end_pos=36)
             ),
             data.Extraction(
                 extraction_class="date",
                 extraction_text="1976",
-                char_interval=data.CharInterval(start=40, end=44)
+                char_interval=data.CharInterval(start_pos=40, end_pos=44)
             )
         ]
         
@@ -296,9 +302,23 @@ class TestExtractionAnnotator:
             author="test_system",
             include_timestamps=True
         )
-        
+
         assert annotator.author == "test_system"
         assert annotator.include_timestamps == True
+
+    def test_annotator_without_timestamps(self):
+        """Annotations should omit timestamps when disabled."""
+        text = "Reach Mary via mary@example.com"
+        extraction = data.Extraction(
+            extraction_class="email",
+            extraction_text="mary@example.com",
+            char_interval=data.CharInterval(start_pos=11, end_pos=27)
+        )
+
+        annotator = ExtractionAnnotator(include_timestamps=False)
+        annotations = annotator.annotate_extraction(extraction, text)
+
+        assert all(ann.timestamp is None for ann in annotations)
     
     def test_annotate_extraction(self):
         """Test annotating a single extraction."""
@@ -306,7 +326,7 @@ class TestExtractionAnnotator:
         extraction = data.Extraction(
             extraction_class="email",
             extraction_text="john@example.com",
-            char_interval=data.CharInterval(start=22, end=38)
+            char_interval=data.CharInterval(start_pos=22, end_pos=38)
         )
         
         annotator = ExtractionAnnotator()
@@ -333,12 +353,12 @@ class TestExtractionAnnotator:
             data.Extraction(
                 extraction_class="organization",
                 extraction_text="Apple Inc.",
-                char_interval=data.CharInterval(start=0, end=10)
+                char_interval=data.CharInterval(start_pos=0, end_pos=10)
             ),
             data.Extraction(
                 extraction_class="person",
                 extraction_text="Steve Jobs",
-                char_interval=data.CharInterval(start=26, end=36)
+                char_interval=data.CharInterval(start_pos=26, end_pos=36)
             )
         ]
         
