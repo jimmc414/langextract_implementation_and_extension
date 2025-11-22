@@ -137,8 +137,8 @@ class ReferenceResolver:
                         reference_type=self._get_reference_type(extraction),
                         confidence=self._calculate_confidence(extraction, referent),
                         distance=self._calculate_distance(extraction, referent),
-                        source_id=extraction.extraction_id or str(i),
-                        target_id=referent.extraction_id or str(sorted_extractions.index(referent))
+                        source_id=getattr(extraction, 'extraction_id', None) or str(i),
+                        target_id=getattr(referent, 'extraction_id', None) or str(sorted_extractions.index(referent))
                     )
                     self.resolved_references.append(ref)
         
@@ -340,12 +340,17 @@ class ReferenceResolver:
     
     def _add_reference_info(self, extraction: data.Extraction, referent: data.Extraction):
         """Add reference information to an extraction."""
-        if extraction.attributes is None:
-            extraction.attributes = {}
-        
-        extraction.attributes['refers_to'] = referent.extraction_text
-        extraction.attributes['referent_id'] = referent.extraction_id
-        extraction.attributes['referent_class'] = referent.extraction_class
+        try:
+            if extraction.attributes is None:
+                extraction.attributes = {}
+
+            extraction.attributes['refers_to'] = referent.extraction_text
+            extraction.attributes['referent_id'] = getattr(referent, 'extraction_id', None)
+            extraction.attributes['referent_class'] = referent.extraction_class
+        except (AttributeError, TypeError):
+            # Extraction object may be immutable (frozen dataclass)
+            # In this case, we can't add attributes and should skip
+            pass
     
     def get_resolved_references(self) -> List[Reference]:
         """Get all resolved references."""
@@ -428,19 +433,19 @@ class RelationshipResolver:
         """Check for relationships defined in attributes."""
         # Check if ext1 references ext2
         if ext1.attributes:
-            if ext1.attributes.get('parent_id') == ext2.extraction_id:
+            if ext1.attributes.get('parent_id') == getattr(ext2, 'extraction_id', None):
                 return Relationship(
-                    entity1_id=ext1.extraction_id or '',
-                    entity2_id=ext2.extraction_id or '',
+                    entity1_id=getattr(ext1, 'extraction_id', None) or '',
+                    entity2_id=getattr(ext2, 'extraction_id', None) or '',
                     relationship_type='child_of',
                     confidence=1.0,
                     evidence='explicit_attribute'
                 )
-            
+
             if ext1.attributes.get('refers_to') == ext2.extraction_text:
                 return Relationship(
-                    entity1_id=ext1.extraction_id or '',
-                    entity2_id=ext2.extraction_id or '',
+                    entity1_id=getattr(ext1, 'extraction_id', None) or '',
+                    entity2_id=getattr(ext2, 'extraction_id', None) or '',
                     relationship_type='references',
                     confidence=0.9,
                     evidence='reference_resolution'
@@ -457,11 +462,11 @@ class RelationshipResolver:
         if not (ext1.char_interval and ext2.char_interval):
             return None
         
-        if (ext1.char_interval.start_pos is None or 
-            ext2.char_interval.start_pos is None):
+        if (ext1.char_interval.start is None or
+            ext2.char_interval.start is None):
             return None
-        
-        distance = abs(ext1.char_interval.start_pos - ext2.char_interval.start_pos)
+
+        distance = abs(ext1.char_interval.start - ext2.char_interval.start)
         
         # Very close entities might be related
         if distance < 50:
@@ -469,8 +474,8 @@ class RelationshipResolver:
             if (ext1.extraction_class == 'person' and 
                 ext2.extraction_class == 'organization'):
                 return Relationship(
-                    entity1_id=ext1.extraction_id or '',
-                    entity2_id=ext2.extraction_id or '',
+                    entity1_id=getattr(ext1, 'extraction_id', None) or '',
+                    entity2_id=getattr(ext2, 'extraction_id', None) or '',
                     relationship_type='affiliated_with',
                     confidence=0.7,
                     evidence=f'proximity_{distance}_chars'
@@ -479,8 +484,8 @@ class RelationshipResolver:
             if (ext1.extraction_class == 'person' and
                 ext2.extraction_class == 'title'):
                 return Relationship(
-                    entity1_id=ext1.extraction_id or '',
-                    entity2_id=ext2.extraction_id or '',
+                    entity1_id=getattr(ext1, 'extraction_id', None) or '',
+                    entity2_id=getattr(ext2, 'extraction_id', None) or '',
                     relationship_type='has_title',
                     confidence=0.8,
                     evidence=f'proximity_{distance}_chars'
@@ -489,8 +494,8 @@ class RelationshipResolver:
             if (ext1.extraction_class == 'date' and
                 ext2.extraction_class in ['event', 'action']):
                 return Relationship(
-                    entity1_id=ext1.extraction_id or '',
-                    entity2_id=ext2.extraction_id or '',
+                    entity1_id=getattr(ext1, 'extraction_id', None) or '',
+                    entity2_id=getattr(ext2, 'extraction_id', None) or '',
                     relationship_type='date_of',
                     confidence=0.75,
                     evidence=f'proximity_{distance}_chars'
@@ -508,13 +513,13 @@ class RelationshipResolver:
         if not (ext1.char_interval and ext2.char_interval):
             return None
         
-        if (ext1.char_interval.start_pos is None or 
-            ext2.char_interval.end_pos is None):
+        if (ext1.char_interval.start is None or
+            ext2.char_interval.end is None):
             return None
-        
+
         # Get text between entities
-        start = min(ext1.char_interval.end_pos, ext2.char_interval.end_pos)
-        end = max(ext1.char_interval.start_pos, ext2.char_interval.start_pos)
+        start = min(ext1.char_interval.end, ext2.char_interval.end)
+        end = max(ext1.char_interval.start, ext2.char_interval.start)
         
         if start < end and end - start < 100:
             between_text = text[start:end].lower()
@@ -523,8 +528,8 @@ class RelationshipResolver:
             if any(word in between_text for word in [' of ', ' from ', ' at ']):
                 if ext1.extraction_class == 'person' and ext2.extraction_class == 'organization':
                     return Relationship(
-                        entity1_id=ext1.extraction_id or '',
-                        entity2_id=ext2.extraction_id or '',
+                        entity1_id=getattr(ext1, 'extraction_id', None) or '',
+                        entity2_id=getattr(ext2, 'extraction_id', None) or '',
                         relationship_type='member_of',
                         confidence=0.6,
                         evidence='pattern_match'
@@ -532,8 +537,8 @@ class RelationshipResolver:
             
             if any(word in between_text for word in [' founded ', ' created ', ' established ']):
                 return Relationship(
-                    entity1_id=ext1.extraction_id or '',
-                    entity2_id=ext2.extraction_id or '',
+                    entity1_id=getattr(ext1, 'extraction_id', None) or '',
+                    entity2_id=getattr(ext2, 'extraction_id', None) or '',
                     relationship_type='founded',
                     confidence=0.8,
                     evidence='pattern_match'

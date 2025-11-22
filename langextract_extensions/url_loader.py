@@ -8,7 +8,7 @@ import PyPDF2
 import io
 import tempfile
 import os
-from typing import Optional
+from typing import Optional, List
 from langextract import data
 import google.generativeai as genai
 from urllib.parse import urlparse
@@ -129,10 +129,8 @@ def _extract_pdf_from_response(
         text=text,
         document_id=document_id
     )
-    doc._metadata = {
-        'source_url': url,
-        'content_type': 'application/pdf'
-    }
+    # Note: Document doesn't support _metadata attribute
+    # Metadata (source_url, content_type) would need to be tracked separately
     return doc
 
 
@@ -168,11 +166,8 @@ def _extract_html_text(html_content: str, document_id: str, url: str) -> data.Do
         text=text,
         document_id=document_id
     )
-    doc._metadata = {
-            'source_url': url,
-            'content_type': 'text/html',
-            'title': title_text
-        }
+    # Note: Document doesn't support _metadata attribute
+    # Metadata (source_url, content_type, title) would need to be tracked separately
     return doc
 
 
@@ -217,20 +212,17 @@ def _extract_image_text(
         text=text,
         document_id=document_id
     )
-    doc._metadata = {
-            'source_url': url,
-            'content_type': 'image',
-            'extraction_method': 'gemini_vision'
-        }
+    # Note: Document doesn't support _metadata attribute
+    # Metadata (source_url, content_type, extraction_method) would need to be tracked separately
     return doc
 
 
 # Convenience function for batch loading
 def load_documents_from_urls(
-    urls: list[str],
+    urls: List[str],
     use_gemini_for_pdf: bool = True,
     gemini_api_key: Optional[str] = None
-) -> list[data.Document]:
+) -> List[data.Document]:
     """Load multiple documents from URLs."""
     documents = []
     

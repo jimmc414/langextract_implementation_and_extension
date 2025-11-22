@@ -71,15 +71,19 @@ def multi_pass_extract(
             prev_summary = _summarize_extractions(all_extractions)
             if prev_summary:
                 additional_context = f"{additional_context}\n\nPreviously found: {prev_summary}"
-        
+
+        # Append context to prompt since lx.extract() doesn't support additional_context parameter
+        full_prompt = prompt
+        if additional_context:
+            full_prompt = f"{prompt}\n\nContext: {additional_context}"
+
         # Perform extraction
         try:
             result = lx.extract(
                 text_or_documents=text,
-                prompt_description=prompt,
+                prompt_description=full_prompt,
                 examples=pass_config.get('examples', []),
                 model_id=model_id,
-                additional_context=additional_context,
                 debug=False  # Suppress individual pass debug output
             )
             
@@ -117,7 +121,7 @@ def multi_pass_extract(
     # Sort extractions by position
     sorted_extractions = sorted(
         all_extractions,
-        key=lambda x: x.char_interval.start_pos if x.char_interval and x.char_interval.start_pos else 0
+        key=lambda x: x.char_interval.start if x.char_interval and x.char_interval.start else 0
     )
     
     if debug:
@@ -136,18 +140,18 @@ def _overlaps_with_existing(
     existing: List[data.Extraction]
 ) -> bool:
     """Check if extraction overlaps with any existing extraction."""
-    if not extraction.char_interval or extraction.char_interval.start_pos is None:
+    if not extraction.char_interval or extraction.char_interval.start is None:
         return False
-    
-    start1 = extraction.char_interval.start_pos
-    end1 = extraction.char_interval.end_pos
-    
+
+    start1 = extraction.char_interval.start
+    end1 = extraction.char_interval.end
+
     for existing_ext in existing:
-        if not existing_ext.char_interval or existing_ext.char_interval.start_pos is None:
+        if not existing_ext.char_interval or existing_ext.char_interval.start is None:
             continue
-            
-        start2 = existing_ext.char_interval.start_pos
-        end2 = existing_ext.char_interval.end_pos
+
+        start2 = existing_ext.char_interval.start
+        end2 = existing_ext.char_interval.end
         
         # Check for overlap
         if start1 < end2 and end1 > start2:

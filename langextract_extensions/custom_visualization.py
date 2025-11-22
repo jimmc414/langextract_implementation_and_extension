@@ -357,7 +357,7 @@ class HTMLTemplate:
         
         first_pos = '[0-0]'
         if extractions and extractions[0].char_interval:
-            first_pos = f'[{extractions[0].char_interval.start_pos}-{extractions[0].char_interval.end_pos}]'
+            first_pos = f'[{extractions[0].char_interval.start}-{extractions[0].char_interval.end}]'
         
         status_html = Template(status_template).safe_substitute(
             total=len(extractions),
@@ -552,8 +552,8 @@ def visualize_with_template(
     
     # Sort extractions properly
     def _extraction_sort_key(extraction):
-        start = extraction.char_interval.start_pos
-        end = extraction.char_interval.end_pos
+        start = extraction.char_interval.start
+        end = extraction.char_interval.end
         span_length = end - start
         return (start, -span_length)
     

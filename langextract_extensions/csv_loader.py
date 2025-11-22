@@ -84,8 +84,8 @@ def load_documents_from_csv(
             text=text,
             document_id=doc_id
         )
-        # Store metadata separately if needed
-        doc._metadata = metadata
+        # Note: metadata is collected but Document doesn't support storing it
+        # If metadata storage is needed, maintain a separate dict mapping doc_id -> metadata
         documents.append(doc)
     
     print(f"Loaded {len(documents)} documents from {csv_path}")
@@ -138,8 +138,8 @@ def load_documents_from_dataframe(
             text=text,
             document_id=doc_id
         )
-        # Store metadata separately if needed
-        doc._metadata = metadata
+        # Note: metadata is collected but Document doesn't support storing it
+        # If metadata storage is needed, maintain a separate dict mapping doc_id -> metadata
         documents.append(doc)
     
     return documents
@@ -171,8 +171,8 @@ def save_extractions_to_csv(
             }
             
             if include_positions and ext.char_interval:
-                row['start_pos'] = ext.char_interval.start_pos
-                row['end_pos'] = ext.char_interval.end_pos
+                row['start_pos'] = ext.char_interval.start
+                row['end_pos'] = ext.char_interval.end
             
             if include_attributes and ext.attributes:
                 # Flatten attributes

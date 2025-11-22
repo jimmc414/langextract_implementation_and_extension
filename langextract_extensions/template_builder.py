@@ -554,12 +554,16 @@ def extract_with_template(
     if result and result.extractions:
         for extraction in result.extractions:
             is_valid, message = template.validate_extraction(extraction)
-            
+
             if not is_valid:
                 # Add validation result to attributes
-                if not extraction.attributes:
-                    extraction.attributes = {}
-                extraction.attributes['validation'] = message
+                try:
+                    if not extraction.attributes:
+                        extraction.attributes = {}
+                    extraction.attributes['validation'] = message
+                except (AttributeError, TypeError):
+                    # Extraction object may be immutable
+                    pass
     
     return result
 

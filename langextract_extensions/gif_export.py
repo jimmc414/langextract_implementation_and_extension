@@ -139,14 +139,14 @@ def _create_text_frame(
     # Prepare text with highlighting info
     highlight_ranges = []
     for ext in extractions:
-        if ext.char_interval and ext.char_interval.start_pos is not None:
+        if ext.char_interval and ext.char_interval.start is not None:
             color = colors.get(ext.extraction_class, colors['default'])
             if ext == current_extraction:
                 # Make current extraction stand out
                 color = '#ff0000'
             highlight_ranges.append({
-                'start': ext.char_interval.start_pos,
-                'end': ext.char_interval.end_pos,
+                'start': ext.char_interval.start,
+                'end': ext.char_interval.end,
                 'color': color,
                 'text': ext.extraction_text,
                 'class': ext.extraction_class

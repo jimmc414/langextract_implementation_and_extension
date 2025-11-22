@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="langextract-extensions",
-    version="0.1.0",
+    version="0.2.0",
     description="Additional features for Google's LangExtract library",
     author="LangExtract Extensions Contributors",
     packages=find_packages(),
